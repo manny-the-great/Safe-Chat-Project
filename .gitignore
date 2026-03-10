@@ -1,0 +1,64 @@
+# SafeChat .gitignore
+
+# Dependencies
+node_modules/
+dist/
+build/
+.next/
+out/
+.vercel
+package-lock.json
+yarn.lock
+
+# Python Environment
+venv/
+.venv/
+env/
+.env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.eggs/
+
+# Database / Storage
+*.sqlite3
+*.db
+db.sqlite3-journal
+mongo_data/
+media/
+staticfiles/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / Tools
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.bak
+
+# Environment Variables (Keep this ignored!)
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+secrets.json
+
+# Large Assets
+*.mp4
+*.MOV
+*.wav
+*.dmg
+*.zip
+*.tar.gz
