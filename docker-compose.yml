@@ -1,0 +1,108 @@
+version: '3.9'
+
+services:
+
+  # ── MongoDB ───────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: safechat_mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-safechat}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-safechat_secret}
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-safechat_db}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - safechat_net
+
+  # ── Redis (WebSocket channel layer) ──────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: safechat_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - safechat_net
+
+  # ── ML Classification Microservice (FastAPI + Detoxify) ───────
+  ml_service:
+    build:
+      context: ./ml_service
+      dockerfile: Dockerfile
+    container_name: safechat_ml
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - safechat_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s   # Detoxify model download takes time on first run
+
+  # ── Django Backend ────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: safechat_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-change-me-in-production}
+      - DEBUG=${DEBUG:-False}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - MONGO_URI=mongodb://${MONGO_USERNAME:-safechat}:${MONGO_PASSWORD:-safechat_secret}@mongo:27017
+      - MONGO_DB_NAME=${MONGO_DB_NAME:-safechat_db}
+      - MONGO_USERNAME=${MONGO_USERNAME:-safechat}
+      - MONGO_PASSWORD=${MONGO_PASSWORD:-safechat_secret}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ML_SERVICE_URL=http://ml_service:8001
+      - ML_SERVICE_TIMEOUT=8
+      - AUTO_BAN_THRESHOLD=${AUTO_BAN_THRESHOLD:-5}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+    depends_on:
+      - mongo
+      - redis
+      - ml_service
+    networks:
+      - safechat_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/auth/login/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── React Frontend ────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - REACT_APP_API_URL=http://localhost:8000
+        - REACT_APP_WS_URL=ws://localhost:8000
+    container_name: safechat_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - safechat_net
+
+networks:
+  safechat_net:
+    driver: bridge
+
+volumes:
+  mongo_data:

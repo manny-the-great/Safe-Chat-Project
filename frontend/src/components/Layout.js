@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { fetchUnreadCount } from '../services/api';
 import toast from 'react-hot-toast';
 
 const AVATAR_COLORS = ['#7c6dfa', '#ff6b9d', '#10d9a0', '#ffad00', '#38bdf8', '#f472b6'];
@@ -16,6 +17,20 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
+  const [unread, setUnread] = useState(0);
+
+  // Poll unread notification count every 60 seconds
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const res = await fetchUnreadCount();
+        setUnread(res.data.unread || 0);
+      } catch {}
+    };
+    poll();
+    const interval = setInterval(poll, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -27,16 +42,16 @@ export default function Layout() {
 
   return (
     <div style={outerWrap}>
-      <div style={innerGrid}>
+      <div style={innerGrid} className="layout-grid">
 
         {/* ─── LEFT SIDEBAR ───────────────────────────────── */}
-        <aside style={sidebar}>
+        <aside style={sidebar} className="layout-sidebar">
 
           {/* Logo */}
           <NavLink to="/" style={{ textDecoration: 'none' }}>
             <div style={logoWrap}>
               <div style={logoIcon}>🛡️</div>
-              <div>
+              <div className="layout-logo-text">
                 <div style={logoName}>SafeChat</div>
                 <div style={logoSub}>AI-Protected · Respectful</div>
               </div>
@@ -51,9 +66,24 @@ export default function Layout() {
                 to={item.to}
                 end={item.exact}
                 style={({ isActive }) => navLink(isActive)}
+                className="layout-nav-link"
               >
-                <span style={navIcon}>{item.icon}</span>
-                <span>{item.label}</span>
+                <span style={{ ...navIcon, position: 'relative' }}>
+                  {item.icon}
+                  {item.to === '/notifications' && unread > 0 && (
+                    <span style={{
+                      position: 'absolute', top: -3, right: -3,
+                      width: 16, height: 16, borderRadius: '50%',
+                      background: 'var(--danger)', color: '#fff',
+                      fontSize: 9, fontWeight: 800, fontFamily: 'var(--mono)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: '2px solid var(--bg)',
+                    }}>
+                      {unread > 9 ? '9+' : unread}
+                    </span>
+                  )}
+                </span>
+                <span className="layout-nav-label">{item.label}</span>
               </NavLink>
             ))}
 
@@ -61,15 +91,17 @@ export default function Layout() {
             <NavLink
               to={`/profile/${user?.username}`}
               style={({ isActive }) => navLink(isActive)}
+              className="layout-nav-link"
             >
               <span style={navIcon}>👤</span>
-              <span>Profile</span>
+              <span className="layout-nav-label">Profile</span>
             </NavLink>
 
             {/* Admin (only if admin) */}
             {user?.is_admin && (
               <NavLink
                 to="/admin"
+                className="layout-nav-link"
                 style={({ isActive }) => ({
                   ...navLink(isActive),
                   ...(isActive ? {
@@ -80,7 +112,7 @@ export default function Layout() {
                 })}
               >
                 <span style={navIcon}>🛡️</span>
-                <span>Admin Panel</span>
+                <span className="layout-nav-label">Admin Panel</span>
               </NavLink>
             )}
           </nav>
@@ -88,24 +120,24 @@ export default function Layout() {
           {/* AI Shield status */}
           <div style={shieldBadge}>
             <div style={shieldDot} />
-            <div>
+            <div className="shield-badge-text">
               <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--success)' }}>AI Shield Active</div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>3-Layer · RoBERTa · Zero-Tolerance</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>4-Layer · RoBERTa · Zero-Tolerance</div>
             </div>
           </div>
 
           {/* User card */}
-          <div style={userCard} onClick={() => setShowMenu(!showMenu)}>
+          <div style={userCard} className="layout-user-card" onClick={() => setShowMenu(!showMenu)}>
             <div style={{ ...avatarStyle, background: avatarBg }}>
               {(user?.display_name || user?.username || '?').slice(0, 2).toUpperCase()}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0 }} className="layout-user-details">
               <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {user?.display_name || user?.username}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>@{user?.username}</div>
             </div>
-            <span style={{ fontSize: 16, color: 'var(--text-muted)', flexShrink: 0 }}>···</span>
+            <span style={{ fontSize: 16, color: 'var(--text-muted)', flexShrink: 0 }} className="layout-dots">···</span>
 
             {showMenu && (
               <div style={dropdownMenu} onClick={(e) => e.stopPropagation()}>
@@ -127,12 +159,12 @@ export default function Layout() {
         </aside>
 
         {/* ─── MAIN FEED ──────────────────────────────────── */}
-        <main style={mainContent}>
+        <main style={mainContent} className="layout-main">
           <Outlet />
         </main>
 
         {/* ─── RIGHT SIDEBAR ──────────────────────────────── */}
-        <aside style={rightSidebar}>
+        <aside style={rightSidebar} className="layout-right-sidebar">
 
           {/* Community Guidelines */}
           <div style={widgetCard}>
@@ -169,6 +201,50 @@ export default function Layout() {
 
         </aside>
       </div>
+
+      {/* ─── MOBILE BOTTOM NAV ──────────────────────────── */}
+      <nav className="mobile-nav">
+        {[
+          { to: '/', icon: '🏠', exact: true },
+          { to: '/explore', icon: '🔍' },
+          { to: '/notifications', icon: '🔔' },
+          { to: `/profile/${user?.username}`, icon: '👤' },
+        ].map(item => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.exact}
+            style={({ isActive }) => ({
+              textDecoration: 'none',
+              color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+              fontSize: 24,
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: isActive ? 'var(--accent-glow)' : 'none',
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            })}
+          >
+            <span style={{ position: 'relative' }}>
+              {item.icon}
+              {item.to === '/notifications' && unread > 0 && (
+                <span style={{
+                  position: 'absolute', top: -4, right: -4,
+                  width: 14, height: 14, borderRadius: '50%',
+                  background: 'var(--danger)', color: '#fff',
+                  fontSize: 8, fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '1.5px solid var(--bg)',
+                }}>
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 }

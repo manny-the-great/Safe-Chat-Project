@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'users',
     'posts',
     'moderation',
+    'notifications',
 ]
 
 MIDDLEWARE = [

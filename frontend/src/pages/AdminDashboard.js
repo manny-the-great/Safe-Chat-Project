@@ -1,26 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { fetchModerationLog, overrideModeration, banUser, fetchAdminStats } from '../services/api';
+import { fetchModerationLog, overrideModeration, banUser, unbanUser, fetchAdminStats, fetchTopUsers } from '../services/api';
 import { format } from 'timeago.js';
 import toast from 'react-hot-toast';
 
 const LAYER_LABELS = {
   LAYER_1_PROFANITY: '⚡ L1 Profanity',
-  LAYER_2_THREAT: '🔫 L2 Threat',
+  LAYER_2_THREAT:   '🔫 L2 Threat',
   LAYER_3_ML_MODEL: '🧠 L3 ML Model',
-  LAYER_4_SENTIMENT: '💭 L4 Sentiment',
-  // legacy
-  LAYER_2_ML_MODEL: '🧠 L2 ML Model',
-  LAYER_3_SENTIMENT: '💭 L3 Sentiment',
-  USER_BANNED: '🔨 Banned',
+  LAYER_4_SENTIMENT:'💭 L4 Sentiment',
+  USER_BANNED:      '🔨 Banned',
 };
 const LAYER_COLORS = {
   LAYER_1_PROFANITY: 'var(--danger)',
-  LAYER_2_THREAT: '#ff7849',
-  LAYER_3_ML_MODEL: 'var(--warning)',
+  LAYER_2_THREAT:    '#ff7849',
+  LAYER_3_ML_MODEL:  'var(--warning)',
   LAYER_4_SENTIMENT: 'var(--accent)',
-  LAYER_2_ML_MODEL: 'var(--warning)',
-  LAYER_3_SENTIMENT: 'var(--accent)',
-  USER_BANNED: 'var(--danger)',
+  USER_BANNED:       'var(--danger)',
 };
 
 function StatCard({ icon, label, value, color, sub }) {
@@ -56,25 +51,30 @@ function ProgressBar({ label, val, total, color }) {
   );
 }
 
+const AVATAR_COLORS = ['#7c6dfa', '#ff6b9d', '#10d9a0', '#ffad00', '#38bdf8', '#f472b6'];
+const getColor = (str = '') => AVATAR_COLORS[(str.charCodeAt(0) || 0) % AVATAR_COLORS.length];
+
 export default function AdminDashboard() {
-  const [tab, setTab] = useState('flagged');
-  const [log, setLog] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [filter, setFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
+  const [tab, setTab]           = useState('flagged');
+  const [log, setLog]           = useState([]);
+  const [stats, setStats]       = useState(null);
+  const [offenders, setOffenders] = useState([]);
+  const [filter, setFilter]     = useState('all');
+  const [loading, setLoading]   = useState(true);
+  const [page, setPage]         = useState(1);
+  const [hasMore, setHasMore]   = useState(false);
   const [confirmBan, setConfirmBan] = useState(null);
 
   useEffect(() => {
-    fetchAdminStats().then((r) => setStats(r.data)).catch(() => { });
+    fetchAdminStats().then(r => setStats(r.data)).catch(() => {});
+    fetchTopUsers().then(r => setOffenders(r.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
     setLoading(true);
     fetchModerationLog(page, filter)
-      .then((r) => {
-        setLog((prev) => page === 1 ? r.data.results : [...prev, ...r.data.results]);
+      .then(r => {
+        setLog(prev => page === 1 ? r.data.results : [...prev, ...r.data.results]);
         setHasMore(!!r.data.next);
       })
       .catch(() => toast.error('Failed to load moderation log'))
@@ -86,7 +86,7 @@ export default function AdminDashboard() {
   const handleOverride = async (id, action) => {
     try {
       await overrideModeration(id, action);
-      setLog((prev) => prev.map((e) => e.id === id ? { ...e, status: action === 'approve' ? 'overridden_approved' : 'rejected' } : e));
+      setLog(prev => prev.map(e => e.id === id ? { ...e, status: action === 'approve' ? 'overridden_approved' : 'rejected' } : e));
       toast.success(action === 'approve' ? '✅ Content approved and published' : 'Decision unchanged');
     } catch { toast.error('Override failed'); }
   };
@@ -96,7 +96,20 @@ export default function AdminDashboard() {
       await banUser(userId, 'Manually banned by admin');
       toast.success(`@${username} has been suspended`);
       setConfirmBan(null);
+      // Refresh offenders list
+      fetchTopUsers().then(r => setOffenders(r.data)).catch(() => {});
     } catch { toast.error('Ban failed'); }
+  };
+
+  const handleUnban = async (userId, username) => {
+    try {
+      await unbanUser(userId);
+      toast.success(`@${username} has been reinstated`);
+      setLog(prev => prev.map(e =>
+        e.author?.id === userId ? { ...e, author: { ...e.author } } : e
+      ));
+      fetchTopUsers().then(r => setOffenders(r.data)).catch(() => {});
+    } catch { toast.error('Unban failed'); }
   };
 
   const totalContent = (stats?.total_posts || 0) + (stats?.total_comments || 0) + (stats?.total_blocked || 0);
@@ -124,17 +137,18 @@ export default function AdminDashboard() {
         {/* Stats row */}
         {stats && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
-            <StatCard icon="📝" label="Total Posts" value={stats.total_posts} color="var(--accent)" />
-            <StatCard icon="🚫" label="Blocked Content" value={stats.total_blocked} color="var(--danger)" sub={`${stats.toxicity_rate}% of all content`} />
-            <StatCard icon="👥" label="Total Users" value={stats.total_users} color="var(--info)" />
-            <StatCard icon="🔨" label="Suspended Users" value={stats.banned_users} color="var(--warning)" />
+            <StatCard icon="📝" label="Total Posts"       value={stats.total_posts}   color="var(--accent)" />
+            <StatCard icon="🚫" label="Blocked Content"   value={stats.total_blocked} color="var(--danger)" sub={`${stats.toxicity_rate}% of all content`} />
+            <StatCard icon="👥" label="Total Users"       value={stats.total_users}   color="var(--info)" />
+            <StatCard icon="🔨" label="Suspended Users"   value={stats.banned_users}  color="var(--warning)" />
           </div>
         )}
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 18, borderBottom: '1px solid var(--border)', paddingBottom: 14 }}>
           {[
-            ['flagged', '🚩 Flagged Content'],
+            ['flagged',   '🚩 Flagged Content'],
+            ['offenders', '⚠️ Top Offenders'],
             ['analytics', '📈 Analytics'],
           ].map(([id, label]) => (
             <button
@@ -181,7 +195,7 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {log.map((entry) => {
+                {log.map(entry => {
                   const layerColor = LAYER_COLORS[entry.rejection_layer] || 'var(--accent)';
                   const isRejected = entry.status === 'rejected';
                   return (
@@ -198,7 +212,6 @@ export default function AdminDashboard() {
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                        {/* Left: content */}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {/* Meta row */}
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
@@ -248,12 +261,10 @@ export default function AdminDashboard() {
                           }}>
                             "{entry.content}"
                           </div>
-
                           <div style={{ fontSize: 12, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 6 }}>
                             <span>⚠️</span>
                             <span>{entry.rejection_reason}</span>
                           </div>
-
                           {entry.violation_count > 1 && (
                             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontFamily: 'var(--mono)' }}>
                               Violation #{entry.violation_count} for this user · {entry.content_type}
@@ -261,7 +272,7 @@ export default function AdminDashboard() {
                           )}
                         </div>
 
-                        {/* Right: actions */}
+                        {/* Actions */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                           {isRejected && (
                             <button
@@ -270,10 +281,9 @@ export default function AdminDashboard() {
                                 padding: '7px 14px', background: 'rgba(16,217,160,0.1)',
                                 color: 'var(--success)', border: '1px solid rgba(16,217,160,0.3)',
                                 borderRadius: 'var(--radius)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                                transition: 'var(--transition)',
                               }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16,217,160,0.2)'}
-                              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(16,217,160,0.1)'}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(16,217,160,0.2)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'rgba(16,217,160,0.1)'}
                             >Override ✓</button>
                           )}
                           <button
@@ -282,11 +292,10 @@ export default function AdminDashboard() {
                               padding: '7px 14px', background: 'rgba(255,71,102,0.08)',
                               color: 'var(--danger)', border: '1px solid rgba(255,71,102,0.25)',
                               borderRadius: 'var(--radius)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                              transition: 'var(--transition)',
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,71,102,0.18)'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,71,102,0.08)'}
-                          >Ban User</button>
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,71,102,0.18)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,71,102,0.08)'}
+                          >Suspend</button>
                         </div>
                       </div>
                     </div>
@@ -295,7 +304,7 @@ export default function AdminDashboard() {
 
                 {hasMore && (
                   <button
-                    onClick={() => setPage((p) => p + 1)}
+                    onClick={() => setPage(p => p + 1)}
                     disabled={loading}
                     style={{
                       padding: '12px', background: 'var(--surface)',
@@ -304,7 +313,6 @@ export default function AdminDashboard() {
                     }}
                   >Load more</button>
                 )}
-
                 {log.length === 0 && !loading && (
                   <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
@@ -317,30 +325,129 @@ export default function AdminDashboard() {
           </>
         )}
 
+        {/* ─── TOP OFFENDERS TAB ─── */}
+        {tab === 'offenders' && (
+          <div>
+            <div style={{ marginBottom: 16, color: 'var(--text-muted)', fontSize: 13 }}>
+              Users ranked by total violation count. Top 10 shown.
+            </div>
+            {offenders.length === 0 ? (
+              <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🕊️</div>
+                <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>No violations recorded</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {offenders.map((u, idx) => {
+                  const avatarBg = `linear-gradient(135deg, ${getColor(u.username)}, #a78bfa)`;
+                  return (
+                    <div key={u.id} className="fade-in" style={{
+                      background: 'var(--surface)', border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius)', padding: '14px 16px',
+                      display: 'flex', alignItems: 'center', gap: 14,
+                    }}>
+                      {/* Rank */}
+                      <div style={{
+                        width: 28, textAlign: 'center',
+                        fontWeight: 900, fontFamily: 'var(--mono)', fontSize: 14,
+                        color: idx === 0 ? 'var(--warning)' : idx === 1 ? 'var(--text-secondary)' : 'var(--text-muted)',
+                      }}>#{idx + 1}</div>
+
+                      {/* Avatar */}
+                      <div style={{
+                        width: 40, height: 40, borderRadius: '50%', background: avatarBg,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 700, fontSize: 14, color: '#fff', flexShrink: 0,
+                      }}>
+                        {(u.display_name || u.username || '?').slice(0, 2).toUpperCase()}
+                      </div>
+
+                      {/* User info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                          <span style={{ fontWeight: 700, color: 'var(--text)', fontSize: 14 }}>{u.display_name}</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>@{u.username}</span>
+                          {u.is_banned && (
+                            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'rgba(255,71,102,0.12)', color: 'var(--danger)', border: '1px solid rgba(255,71,102,0.25)', fontWeight: 700 }}>
+                              🔨 BANNED
+                            </span>
+                          )}
+                        </div>
+                        {u.last_violation?.reason && (
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            Last: {u.last_violation.reason}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Violation count */}
+                      <div style={{
+                        fontFamily: 'var(--mono)', fontWeight: 900, fontSize: 20,
+                        color: u.violation_count >= 5 ? 'var(--danger)' : u.violation_count >= 3 ? 'var(--warning)' : 'var(--text-secondary)',
+                        minWidth: 40, textAlign: 'center',
+                      }}>
+                        {u.violation_count}
+                        <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 400 }}>violations</div>
+                      </div>
+
+                      {/* Actions */}
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        {u.is_banned ? (
+                          <button
+                            onClick={() => handleUnban(u.id, u.username)}
+                            style={{
+                              padding: '7px 14px', background: 'rgba(16,217,160,0.1)',
+                              color: 'var(--success)', border: '1px solid rgba(16,217,160,0.3)',
+                              borderRadius: 'var(--radius)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(16,217,160,0.2)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(16,217,160,0.1)'}
+                          >Reinstate</button>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmBan({ id: u.id, username: u.username })}
+                            style={{
+                              padding: '7px 14px', background: 'rgba(255,71,102,0.08)',
+                              color: 'var(--danger)', border: '1px solid rgba(255,71,102,0.25)',
+                              borderRadius: 'var(--radius)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,71,102,0.18)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,71,102,0.08)'}
+                          >Suspend</button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ─── ANALYTICS TAB ─── */}
         {tab === 'analytics' && stats && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             {/* Classification breakdown */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 20 }}>
               <h3 style={{ color: 'var(--text)', marginBottom: 20, fontSize: 15, fontWeight: 700 }}>🎯 Detection Breakdown</h3>
-              <ProgressBar label="✅ Safe Content" val={stats.total_posts + (stats.total_comments || 0)} total={totalContent} color="var(--success)" />
-              <ProgressBar label="⚡ L1 Profanity" val={stats.blocked_by_layer?.layer1 || 0} total={totalContent} color="var(--danger)" />
-              <ProgressBar label="🔫 L2 Threat Detection" val={stats.blocked_by_layer?.layer2 || 0} total={totalContent} color="#ff7849" />
-              <ProgressBar label="🧠 L3 ML Model" val={stats.blocked_by_layer?.layer3 || 0} total={totalContent} color="var(--warning)" />
-              <ProgressBar label="💭 L4 Sentiment Guard" val={stats.blocked_by_layer?.layer4 || 0} total={totalContent} color="var(--accent)" />
+              <ProgressBar label="✅ Safe Content"         val={(stats.total_posts || 0) + (stats.total_comments || 0)} total={totalContent} color="var(--success)" />
+              <ProgressBar label="⚡ L1 Profanity Filter"  val={stats.blocked_by_layer?.layer1 || 0} total={totalContent} color="var(--danger)" />
+              <ProgressBar label="🔫 L2 Threat Detection"  val={stats.blocked_by_layer?.layer2 || 0} total={totalContent} color="#ff7849" />
+              <ProgressBar label="🧠 L3 ML Model (RoBERTa)"val={stats.blocked_by_layer?.layer3 || 0} total={totalContent} color="var(--warning)" />
+              <ProgressBar label="💭 L4 Sentiment Guard"   val={stats.blocked_by_layer?.layer4 || 0} total={totalContent} color="var(--accent)" />
             </div>
 
             {/* Platform overview */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 20 }}>
               <h3 style={{ color: 'var(--text)', marginBottom: 20, fontSize: 15, fontWeight: 700 }}>🌐 Platform Overview</h3>
               {[
-                ['👥 Total Users', stats.total_users, 'var(--info)'],
-                ['🟢 Active Today', stats.active_today, 'var(--success)'],
-                ['📝 Total Posts', stats.total_posts, 'var(--text)'],
-                ['💬 Total Comments', stats.total_comments, 'var(--text)'],
-                ['🚫 Total Blocked', stats.total_blocked, 'var(--danger)'],
-                ['✅ Content Safe Rate', `${100 - parseFloat(stats.toxicity_rate || 0)}%`, 'var(--success)'],
-                ['🔨 Suspended Users', stats.banned_users, 'var(--warning)'],
+                ['👥 Total Users',       stats.total_users,    'var(--info)'],
+                ['🟢 Active Today',      stats.active_today,   'var(--success)'],
+                ['📝 Total Posts',       stats.total_posts,    'var(--text)'],
+                ['💬 Total Comments',    stats.total_comments, 'var(--text)'],
+                ['🚫 Total Blocked',     stats.total_blocked,  'var(--danger)'],
+                ['✅ Content Safe Rate', `${Math.max(0, 100 - parseFloat(stats.toxicity_rate || 0)).toFixed(1)}%`, 'var(--success)'],
+                ['🔨 Suspended Users',   stats.banned_users,   'var(--warning)'],
               ].map(([label, val, color]) => (
                 <div key={label} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -352,15 +459,15 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {/* Toxicity rate gauge */}
+            {/* Moderation effectiveness full-width */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 20, gridColumn: '1 / -1' }}>
               <h3 style={{ color: 'var(--text)', marginBottom: 16, fontSize: 15, fontWeight: 700 }}>📊 Moderation Effectiveness</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, textAlign: 'center' }}>
                 {[
                   { label: 'Content Safe Rate', val: `${Math.max(0, 100 - parseFloat(stats.toxicity_rate || 0)).toFixed(1)}%`, color: 'var(--success)', icon: '✅' },
-                  { label: 'Toxicity Rate', val: `${stats.toxicity_rate || 0}%`, color: 'var(--danger)', icon: '🚨' },
-                  { label: 'Auto-Ban Rate', val: stats.total_blocked > 0 ? `${((stats.banned_users / stats.total_users) * 100).toFixed(1)}%` : '0%', color: 'var(--warning)', icon: '🔨' },
-                ].map((item) => (
+                  { label: 'Toxicity Rate',     val: `${stats.toxicity_rate || 0}%`,                                           color: 'var(--danger)',  icon: '🚨' },
+                  { label: 'Suspension Rate',   val: stats.total_users > 0 ? `${((stats.banned_users / stats.total_users) * 100).toFixed(1)}%` : '0%', color: 'var(--warning)', icon: '🔨' },
+                ].map(item => (
                   <div key={item.label} style={{ padding: 20, background: 'var(--bg-elevated)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: 32, marginBottom: 8 }}>{item.icon}</div>
                     <div style={{ fontSize: 30, fontWeight: 900, color: item.color, fontFamily: 'var(--mono)', letterSpacing: '-1px' }}>{item.val}</div>
@@ -387,7 +494,7 @@ export default function AdminDashboard() {
               borderRadius: 'var(--radius-xl)', padding: 28, maxWidth: 360, width: '90%',
               boxShadow: 'var(--shadow-lg)',
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
             <div style={{ fontSize: 36, marginBottom: 12, textAlign: 'center' }}>🔨</div>
             <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', textAlign: 'center', marginBottom: 10 }}>Suspend User?</h3>
