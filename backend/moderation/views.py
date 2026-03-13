@@ -55,6 +55,45 @@ def ban_user(request, user_id):
     return Response({'banned': True, 'username': user.username})
 
 
+@api_view(['POST'])
+@permission_classes([IsAdmin])
+def unban_user(request, user_id):
+    user = get_object_or_404(User, pk=user_id)
+    user.is_banned = False
+    user.ban_reason = ''
+    user.violation_count = 0
+    user.save(update_fields=['is_banned', 'ban_reason', 'violation_count'])
+    return Response({'unbanned': True, 'username': user.username})
+
+
+@api_view(['GET'])
+@permission_classes([IsAdmin])
+def top_offenders(request):
+    """Return the top 10 users by violation count with recent rejection details."""
+    from django.db.models import Max
+    users = (
+        User.objects.filter(violation_count__gt=0)
+        .order_by('-violation_count')[:10]
+    )
+    result = []
+    for u in users:
+        last_log = ModerationLog.objects.filter(user=u).order_by('-created_at').first()
+        result.append({
+            'id': u.id,
+            'username': u.username,
+            'display_name': u.display_name,
+            'violation_count': u.violation_count,
+            'is_banned': u.is_banned,
+            'last_violation': {
+                'reason': last_log.rejection_reason if last_log else None,
+                'layer': last_log.rejection_layer if last_log else None,
+                'content': last_log.content[:80] if last_log else None,
+                'at': last_log.created_at.isoformat() if last_log else None,
+            },
+        })
+    return Response(result)
+
+
 @api_view(['GET'])
 @permission_classes([IsAdmin])
 def admin_stats(request):
@@ -74,12 +113,23 @@ def admin_stats(request):
     log_qs = ModerationLog.objects.all()
     total_blocked = log_qs.filter(status='rejected').count()
 
-    # By layer
+    # By layer — keys match classifier.py rejection_layer values exactly
     layer_counts = {
         'layer1': log_qs.filter(rejection_layer='LAYER_1_PROFANITY').count(),
-        'layer2': log_qs.filter(rejection_layer='LAYER_2_ML_MODEL').count(),
-        'layer3': log_qs.filter(rejection_layer='LAYER_3_SENTIMENT').count(),
+        'layer2': log_qs.filter(rejection_layer='LAYER_2_THREAT').count(),
+        'layer3': log_qs.filter(rejection_layer='LAYER_3_ML_MODEL').count(),
+        'layer4': log_qs.filter(rejection_layer='LAYER_4_SENTIMENT').count(),
     }
+
+    # Most common flagged terms across recent rejections
+    from django.db.models import Count as DCount
+    common_terms_qs = (
+        ModerationLog.objects
+        .filter(status='rejected')
+        .values('matched_categories')
+        .annotate(count=DCount('id'))
+        .order_by('-count')[:10]
+    )
 
     total_content = total_posts + total_comments + total_blocked
     toxicity_rate = round((total_blocked / total_content * 100), 1) if total_content > 0 else 0

@@ -101,4 +101,17 @@ export const fetchAdminStats = () =>
 export const fetchTopUsers = () =>
   api.get('/api/admin/top-offenders/');
 
+// ── NOTIFICATIONS ────────────────────────────────────────
+export const fetchNotifications = (page = 1) =>
+  api.get(`/api/notifications/?page=${page}`);
+
+export const fetchUnreadCount = () =>
+  api.get('/api/notifications/unread/');
+
+export const markAllRead = () =>
+  api.post('/api/notifications/read-all/');
+
+export const markNotifRead = (id) =>
+  api.post(`/api/notifications/${id}/read/`);
+
 export default api;
