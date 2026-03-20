@@ -459,6 +459,41 @@ export default function AdminDashboard() {
               ))}
             </div>
 
+            {/* Common Flagged categories */}
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 20, gridColumn: '1 / -1' }}>
+              <h3 style={{ color: 'var(--text)', marginBottom: 20, fontSize: 15, fontWeight: 700 }}>🧬 Major Violation Archetypes</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+                {stats.common_categories?.length > 0 ? (
+                  stats.common_categories.map((cat, idx) => (
+                    <div key={idx} style={{
+                      background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                      padding: '12px 14px', borderRadius: 'var(--radius)',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{
+                          fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-muted)',
+                          width: 20,
+                        }}>#{idx + 1}</span>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', textTransform: 'capitalize' }}>
+                          {cat.name.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: 12, fontWeight: 800, color: 'var(--danger)',
+                        background: 'rgba(255,71,102,0.1)', padding: '2px 8px', borderRadius: 6,
+                        fontFamily: 'var(--mono)',
+                      }}>{cat.count}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', gridColumn: '1 / -1' }}>
+                    No violation data available yet.
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Moderation effectiveness full-width */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 20, gridColumn: '1 / -1' }}>
               <h3 style={{ color: 'var(--text)', marginBottom: 16, fontSize: 15, fontWeight: 700 }}>📊 Moderation Effectiveness</h3>

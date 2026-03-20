@@ -30,14 +30,18 @@ SafeChat doesn't just moderate; it filters in real-time. Every post and comment 
 
 ---
 
-### ⚡ Quick Start
-**1. Prerequisites**
+**0. One-Click Docker Setup (Recommended)**
+```bash
+docker-compose up --build
+```
+
+**1. Prerequisites (For manual setup)**
 - Python 3.10+
 - Node.js 18+
 - MongoDB
 - Redis
 
-**2. Setup Services**
+**2. Manual Setup Sequence**
 - Backend: `pip install -r requirements.txt` → `python manage.py migrate` → `python manage.py runserver`
 - ML Service: `cd ml_service` → `pip install -r requirements.txt` → `python main.py`
 - Frontend: `cd frontend` → `npm install` → `npm start`
