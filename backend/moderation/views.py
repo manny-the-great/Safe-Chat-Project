@@ -121,15 +121,15 @@ def admin_stats(request):
         'layer4': log_qs.filter(rejection_layer='LAYER_4_SENTIMENT').count(),
     }
 
-    # Most common flagged terms across recent rejections
-    from django.db.models import Count as DCount
-    common_terms_qs = (
-        ModerationLog.objects
-        .filter(status='rejected')
-        .values('matched_categories')
-        .annotate(count=DCount('id'))
-        .order_by('-count')[:10]
-    )
+    # Most common flagged categories across recent rejections
+    from collections import Counter
+    all_categories = []
+    recent_logs = ModerationLog.objects.filter(status='rejected').order_by('-created_at')[:200].values_list('matched_categories', flat=True)
+    for cats in recent_logs:
+        if isinstance(cats, list):
+            all_categories.extend(cats)
+    
+    common_categories = [{'name': name, 'count': count} for name, count in Counter(all_categories).most_common(10)]
 
     total_content = total_posts + total_comments + total_blocked
     toxicity_rate = round((total_blocked / total_content * 100), 1) if total_content > 0 else 0
@@ -143,4 +143,5 @@ def admin_stats(request):
         'total_blocked': total_blocked,
         'toxicity_rate': toxicity_rate,
         'blocked_by_layer': layer_counts,
+        'common_categories': common_categories,
     })
