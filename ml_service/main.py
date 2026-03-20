@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title='SafeChat Classification Engine',
-    description='Three-layer zero-tolerance content moderation API',
-    version='1.0.0',
+    description='Four-layer zero-tolerance content moderation API',
+    version='2.0.0',
 )
 
 
@@ -63,7 +63,7 @@ def health():
 @app.post('/classify', response_model=ClassifyResponse)
 def classify_endpoint(req: ClassifyRequest):
     """
-    Classify a piece of text through the three-layer pipeline.
+    Classify a piece of text through the four-layer pipeline.
     Returns is_toxic, toxicity_score, label, and rejection details.
     """
     try:
