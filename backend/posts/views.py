@@ -153,7 +153,10 @@ def comments(request, post_pk):
         parent = get_object_or_404(Comment, pk=parent_id, post=post)
 
     comment = Comment.objects.create(
-        post=post, author=request.user, content=content, parent=parent,
+        post=post, author=request.user,
+        content=content,
+        original_text=content,   # Spec requires original_text stored separately
+        parent=parent,
         toxicity_score=classification.get('toxicity_score', 0.0),
         classification_result=classification.get('label', 'non-toxic'),
         is_published=True,

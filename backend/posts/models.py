@@ -47,6 +47,7 @@ class Comment(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
     content = models.TextField(max_length=280)
+    original_text = models.TextField(blank=True, default='')   # Raw submitted text (spec requirement)
     like_count = models.IntegerField(default=0)
     is_published = models.BooleanField(default=True)
     # Moderation metadata

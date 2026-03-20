@@ -134,7 +134,7 @@ export default function ContentBox({
                   Checking for inappropriate content…
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>
-                  3-layer AI moderation · usually &lt;1s
+                  4-layer AI moderation · usually &lt;1s
                 </div>
               </div>
             </div>
