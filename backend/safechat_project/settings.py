@@ -80,9 +80,6 @@ DATABASES = {
         'NAME': os.getenv('MONGO_DB_NAME', 'safechat_db'),
         'CLIENT': {
             'host': os.getenv('MONGO_URI', 'mongodb://localhost:27017'),
-            'username': os.getenv('MONGO_USERNAME', ''),
-            'password': os.getenv('MONGO_PASSWORD', ''),
-            'authSource': 'admin',
         }
     }
 }
