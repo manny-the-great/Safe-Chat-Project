@@ -22,7 +22,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def get_is_followed_by_me(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            return obj.follower_set.filter(follower=request.user).exists()
+            from .models import Follow
+            return Follow.objects.filter(following=obj, follower=request.user).exists()
         return False
 
 
