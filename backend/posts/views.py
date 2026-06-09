@@ -12,8 +12,12 @@ from .serializers import PostSerializer, CommentSerializer
 from .moderation_service import classify_content, handle_rejection
 
 
+import os
+
 def push_to_ws(event_type: str, data: dict):
     """Broadcast a real-time event to all connected feed clients."""
+    if not os.getenv('REDIS_URL'):
+        return
     try:
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
@@ -29,7 +33,7 @@ def push_to_ws(event_type: str, data: dict):
 @permission_classes([IsAuthenticated])
 def posts(request):
     if request.method == 'GET':
-        qs = Post.objects.filter(is_published=True).select_related('author').order_by('-created_at')
+        qs = Post.objects.filter(is_published=True).order_by('-created_at')
         paginator = PageNumberPagination()
         paginator.page_size = 20
         page = paginator.paginate_queryset(qs, request)
