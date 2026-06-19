@@ -8,8 +8,8 @@ services:
     container_name: safechat_mongo
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-safechat}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-safechat_secret}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-safechat_db}
     ports:
       - "27017:27017"
@@ -63,13 +63,13 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-change-me-in-production}
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
       - DEBUG=${DEBUG:-False}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
-      - MONGO_URI=mongodb://${MONGO_USERNAME:-safechat}:${MONGO_PASSWORD:-safechat_secret}@mongo:27017
+      - MONGO_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongo:27017
       - MONGO_DB_NAME=${MONGO_DB_NAME:-safechat_db}
-      - MONGO_USERNAME=${MONGO_USERNAME:-safechat}
-      - MONGO_PASSWORD=${MONGO_PASSWORD:-safechat_secret}
+      - MONGO_USERNAME=${MONGO_USERNAME}
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - ML_SERVICE_URL=http://ml_service:8001
