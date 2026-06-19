@@ -30,6 +30,17 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
+# Windows Python 3.8+ DLL loading workaround for PyTorch
+try:
+    import site
+    packages = site.getsitepackages()
+    if packages:
+        torch_lib = os.path.join(packages[0], 'torch', 'lib')
+        if os.path.exists(torch_lib):
+            os.add_dll_directory(torch_lib)
+except Exception:
+    pass
+
 import torch
 import torch.nn as nn
 from torch.optim import AdamW

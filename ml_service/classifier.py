@@ -17,6 +17,17 @@ import time
 import logging
 from typing import Optional
 
+# Windows Python 3.8+ DLL loading workaround for PyTorch
+try:
+    import os, site
+    packages = site.getsitepackages()
+    if packages:
+        torch_lib = os.path.join(packages[0], 'torch', 'lib')
+        if os.path.exists(torch_lib):
+            os.add_dll_directory(torch_lib)
+except Exception:
+    pass
+
 logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────

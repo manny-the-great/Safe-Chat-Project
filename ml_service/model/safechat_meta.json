@@ -1,0 +1,84 @@
+{
+  "safechat_model": true,
+  "base_model": "distilroberta-base",
+  "label_columns": [
+    "toxic",
+    "severe_toxic",
+    "obscene",
+    "threat",
+    "insult",
+    "identity_hate"
+  ],
+  "num_labels": 6,
+  "threshold": 0.4,
+  "saved_at": "2026-06-19T04:32:44.088655",
+  "best_epoch_metrics": {
+    "epoch": 3,
+    "train_loss": 0.07279736564261839,
+    "val_loss": 0.08583289446930091,
+    "val_mean_auc": 0.9781114020295112,
+    "val_auc": {
+      "toxic": 0.9881682988155892,
+      "severe_toxic": 0.9790206185567011,
+      "obscene": 0.9886702334068148,
+      "threat": 0.964875252016129,
+      "insult": 0.9737083683561921,
+      "identity_hate": 0.974225641025641
+    }
+  },
+  "test_metrics": {
+    "mean_auc": 0.9649695211046851,
+    "auc": {
+      "toxic": 0.9809011638969073,
+      "severe_toxic": 0.9701251322028259,
+      "obscene": 0.9834686353565072,
+      "threat": 0.9381300403225806,
+      "insult": 0.9741041962179154,
+      "identity_hate": 0.9430879586313745
+    }
+  },
+  "training_history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.15440118061751126,
+      "val_loss": 0.09782906234382636,
+      "val_mean_auc": 0.9660691215847114,
+      "val_auc": {
+        "toxic": 0.9874569906702839,
+        "severe_toxic": 0.9750000000000001,
+        "obscene": 0.9854832850337272,
+        "threat": 0.9339402721774195,
+        "insult": 0.9724008482935041,
+        "identity_hate": 0.9421333333333333
+      }
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.08591298875189386,
+      "val_loss": 0.08668869325802439,
+      "val_mean_auc": 0.9740171825780578,
+      "val_auc": {
+        "toxic": 0.9876541167648162,
+        "severe_toxic": 0.97893470790378,
+        "obscene": 0.9882202627168322,
+        "threat": 0.948305191532258,
+        "insult": 0.9725170216788649,
+        "identity_hate": 0.9684717948717949
+      }
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.07279736564261839,
+      "val_loss": 0.08583289446930091,
+      "val_mean_auc": 0.9781114020295112,
+      "val_auc": {
+        "toxic": 0.9881682988155892,
+        "severe_toxic": 0.9790206185567011,
+        "obscene": 0.9886702334068148,
+        "threat": 0.964875252016129,
+        "insult": 0.9737083683561921,
+        "identity_hate": 0.974225641025641
+      }
+    }
+  ]
+}
