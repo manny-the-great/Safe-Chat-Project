@@ -106,43 +106,138 @@ class ThreatFilter:
 
 
 # ─────────────────────────────────────────────────────────────
-# LAYER 3: ML TOXICITY MODEL (Detoxify)
+# LAYER 3: ML TOXICITY MODEL
 # ─────────────────────────────────────────────────────────────
+# Priority:
+#   1. Fine-tuned SafeChat model  → loaded from ./model/ (produced by train/train.py)
+#   2. Detoxify (fallback)        → used if ./model/ does not exist yet
+# ─────────────────────────────────────────────────────────────
+
+import os
+from pathlib import Path
+
+# Labels match the Jigsaw dataset and train/dataset.py LABEL_COLUMNS
+_LABEL_COLUMNS = [
+    'toxic', 'severe_toxic', 'obscene',
+    'threat', 'insult', 'identity_hate',
+]
+
+# Path where train.py saves the fine-tuned model
+_MODEL_DIR = Path(__file__).parent / 'model'
+
+
 class MLToxicityModel:
-    THRESHOLD = 0.40  # Zero-tolerance threshold
+    THRESHOLD = 0.40  # Toxicity firing threshold (same as before)
 
     def __init__(self):
-        self._model = None
-        self._loaded = False
+        self._model      = None       # Either custom RoBERTa or Detoxify instance
+        self._tokenizer  = None       # Set only for custom model path
+        self._device     = None       # torch device
+        self._mode       = None       # 'custom' | 'detoxify' | None
+        self._loaded     = False
 
+    # ── Loader ────────────────────────────────────────────────
     def load(self):
-        if self._loaded: return
+        """Load the best available model. Called once on startup."""
+        if self._loaded:
+            return
+
+        # ── Attempt 1: Fine-tuned SafeChat model ────────────
+        if _MODEL_DIR.exists() and ((_MODEL_DIR / 'config.json').exists()):
+            try:
+                import torch
+                from transformers import RobertaTokenizer, RobertaForSequenceClassification
+
+                logger.info(f'Loading fine-tuned SafeChat RoBERTa from {_MODEL_DIR} ...')
+                self._tokenizer = RobertaTokenizer.from_pretrained(str(_MODEL_DIR))
+                self._device    = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+                self._model     = RobertaForSequenceClassification.from_pretrained(
+                    str(_MODEL_DIR),
+                    num_labels=len(_LABEL_COLUMNS),
+                )
+                self._model.to(self._device)
+                self._model.eval()
+                self._mode   = 'custom'
+                self._loaded = True
+                logger.info(f'Fine-tuned SafeChat model loaded on {self._device}.')
+                return
+            except Exception as e:
+                logger.warning(f'Fine-tuned model load failed ({e}), falling back to Detoxify.')
+
+        # ── Attempt 2: Detoxify fallback ────────────────────
         try:
             from detoxify import Detoxify
-            logger.info('Loading RoBERTa model...')
-            self._model = Detoxify('original')
+            logger.info('Loading Detoxify (fallback) RoBERTa model...')
+            self._model  = Detoxify('original')
+            self._mode   = 'detoxify'
             self._loaded = True
+            logger.info('Detoxify model loaded.')
         except Exception as e:
             logger.error(f'Detoxify load error: {e}')
-            self._model = None
+            self._model  = None
+            self._mode   = None
             self._loaded = True
 
+    # ── Inference ─────────────────────────────────────────────
     def score(self, text: str) -> dict:
+        """
+        Run inference and return a unified result dict:
+            {'score': float, 'label': str, 'scores': {label: float, ...}}
+        """
         self.load()
+
         if self._model is None:
-            return {'score': 0.0, 'label': 'ml_unavailable', 'scores': {}}
+            return {'score': 0.0, 'label': 'ml_unavailable', 'scores': {}, 'model_mode': None}
+
         try:
-            results = self._model.predict(text)
-            max_score = max(results.values())
-            dominant_label = max(results, key=results.get)
-            return {
-                'score': float(max_score),
-                'label': dominant_label,
-                'scores': {k: float(v) for k, v in results.items()},
-            }
+            if self._mode == 'custom':
+                return self._score_custom(text)
+            else:
+                return self._score_detoxify(text)
         except Exception as e:
-            logger.error(f'Inference error: {e}')
-            return {'score': 0.0, 'label': 'error', 'scores': {}}
+            logger.error(f'Inference error ({self._mode}): {e}')
+            return {'score': 0.0, 'label': 'error', 'scores': {}, 'model_mode': self._mode}
+
+    def _score_custom(self, text: str) -> dict:
+        """Inference using the fine-tuned SafeChat RoBERTa."""
+        import torch
+
+        inputs = self._tokenizer(
+            text,
+            max_length=256,
+            padding='max_length',
+            truncation=True,
+            return_tensors='pt',
+        )
+        inputs = {k: v.to(self._device) for k, v in inputs.items()}
+
+        with torch.no_grad():
+            outputs = self._model(**inputs)
+            probs   = torch.sigmoid(outputs.logits).cpu().squeeze(0).tolist()
+
+        scores        = {label: float(prob) for label, prob in zip(_LABEL_COLUMNS, probs)}
+        max_score     = max(scores.values())
+        dominant_label = max(scores, key=scores.get)
+
+        return {
+            'score':      max_score,
+            'label':      dominant_label,
+            'scores':     scores,
+            'model_mode': 'custom',
+        }
+
+    def _score_detoxify(self, text: str) -> dict:
+        """Inference using Detoxify (fallback path)."""
+        results        = self._model.predict(text)
+        max_score      = max(results.values())
+        dominant_label = max(results, key=results.get)
+
+        return {
+            'score':      float(max_score),
+            'label':      dominant_label,
+            'scores':     {k: float(v) for k, v in results.items()},
+            'model_mode': 'detoxify',
+        }
 
 
 # ─────────────────────────────────────────────────────────────

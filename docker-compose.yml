@@ -39,6 +39,11 @@ services:
       - "8001:8001"
     environment:
       - PYTHONUNBUFFERED=1
+    volumes:
+      # Persist the fine-tuned RoBERTa model across container rebuilds.
+      # After running train/train.py, the model is saved to ./ml_service/model/
+      # and the container picks it up automatically on next startup.
+      - ./ml_service/model:/app/model
     networks:
       - safechat_net
     healthcheck:

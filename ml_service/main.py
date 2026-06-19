@@ -57,6 +57,7 @@ def health():
         'status': 'ok',
         'service': 'SafeChat Classification Engine',
         'ml_model_loaded': ml_model._loaded and ml_model._model is not None,
+        'ml_model_mode': ml_model._mode,  # 'custom' | 'detoxify' | None
     }
 
 
